@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import API_URL from "@/lib/api";
 
 interface Product {
   id: number;
@@ -37,14 +38,14 @@ function ShopPageInner() {
   const hasSentAsk = useRef(false);
 
   const refreshCartCount = () => {
-    fetch(`http://localhost:8000/api/cart/${SESSION_ID}`)
+    fetch(`${API_URL}/api/cart/${SESSION_ID}`)
       .then(res => res.json())
       .then(data => setCartCount(data.items?.length || 0))
       .catch(() => {});
   };
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/products")
+    fetch(`${API_URL}/api/products`)
       .then(res => res.json())
       .then(data => {
         setProducts(data);
@@ -84,7 +85,7 @@ function ShopPageInner() {
     setChatLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8000/api/chat", {
+      const res = await fetch(`${API_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: SESSION_ID, message: msg })

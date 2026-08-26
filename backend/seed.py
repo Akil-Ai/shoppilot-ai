@@ -280,16 +280,20 @@ products_data = [
     }
 ]
 
+def seed_db(db: Session):
+    """Seed the database using an externally provided db session (used from main.py startup)."""
+    for p_data in products_data:
+        product = models.Product(**p_data)
+        db.add(product)
+    db.commit()
+    print("Database seeded successfully with 30 products.")
+
 def seed_data():
     db = SessionLocal()
     # Check if we already have products
     existing = db.query(models.Product).first()
     if not existing:
-        for p_data in products_data:
-            product = models.Product(**p_data)
-            db.add(product)
-        db.commit()
-        print("Database seeded successfully with 30 products.")
+        seed_db(db)
     else:
         print("Database already seeded.")
     db.close()

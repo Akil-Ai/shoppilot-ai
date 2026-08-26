@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import API_URL from "@/lib/api";
 
 interface Product {
   id: number;
@@ -29,7 +30,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const [addedFeedback, setAddedFeedback] = useState(false);
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/products/${resolvedParams.id}`)
+    fetch(`${API_URL}/api/products/${resolvedParams.id}`)
       .then(res => res.json())
       .then(data => {
         setProduct(data);
@@ -41,7 +42,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
       });
 
     // Get current cart count
-    fetch(`http://localhost:8000/api/cart/${SESSION_ID}`)
+    fetch(`${API_URL}/api/cart/${SESSION_ID}`)
       .then(res => res.json())
       .then(data => setCartCount(data.items?.length || 0));
   }, [resolvedParams.id]);
@@ -50,7 +51,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
     if (!product) return;
     setAddingToCart(true);
     try {
-      const res = await fetch("http://localhost:8000/api/cart/add", {
+      const res = await fetch(`${API_URL}/api/cart/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: SESSION_ID, product_id: product.id, quantity: 1 })

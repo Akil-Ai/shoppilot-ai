@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import API_URL from "@/lib/api";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function CheckoutPage() {
     
     try {
       // 1. Create order on backend
-      const res = await fetch("http://localhost:8000/api/payments/create-order", {
+      const res = await fetch(`${API_URL}/api/payments/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId, message: "checkout" })
@@ -33,7 +34,7 @@ export default function CheckoutPage() {
       if (data.key === "mock_id" || data.key === "mock_rp_id") {
         alert("Mock Mode: Payment Simulated Successfully!");
         // Simulate verify
-        await fetch("http://localhost:8000/api/payments/verify", {
+        await fetch(`${API_URL}/api/payments/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
@@ -56,7 +57,7 @@ export default function CheckoutPage() {
         order_id: data.order_id,
         handler: async function (response: any) {
           // Verify payment on backend
-          const verifyRes = await fetch("http://localhost:8000/api/payments/verify", {
+          const verifyRes = await fetch(`${API_URL}/api/payments/verify`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import API_URL from "@/lib/api";
 
 interface CartItem {
   id: number;
@@ -25,7 +26,7 @@ export default function CartPage() {
   const sessionId = "demo-session-123";
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/cart/${sessionId}`)
+    fetch(`${API_URL}/api/cart/${sessionId}`)
       .then(res => res.json())
       .then(data => {
         setItems(data.items);

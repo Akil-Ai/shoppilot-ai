@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import API_URL from "@/lib/api";
 
 interface AuditLog {
   session_id: string;
@@ -16,7 +17,7 @@ export default function AuditTrailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/dashboard/audit")
+    fetch(`${API_URL}/api/dashboard/audit`)
       .then(res => res.json())
       .then(data => {
         setLogs(data);

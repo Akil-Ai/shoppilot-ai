@@ -7,11 +7,12 @@ load_dotenv()
 
 app = FastAPI(title="ShopPilot AI API")
 
-# Configure CORS for local development
+# Allow all origins so Vercel frontend can call the Render backend
+FRONTEND_URL = os.getenv("FRONTEND_URL", "*")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -58,6 +59,20 @@ chat_sessions = {}
 
 @app.on_event("startup")
 async def startup_event():
+    # Create tables
+    from database import Base, engine
+    Base.metadata.create_all(bind=engine)
+    # Auto-seed if DB is empty
+    db = SessionLocal()
+    try:
+        if db.query(models.Product).count() == 0:
+            import seed
+            seed.seed_db(db)
+            print("Database seeded with products.")
+        else:
+            print(f"DB has {db.query(models.Product).count()} products.")
+    finally:
+        db.close()
     # Clear all cached sessions so they're recreated with the current model
     chat_sessions.clear()
     print("Chat sessions cleared on startup.")
