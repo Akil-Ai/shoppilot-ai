@@ -56,6 +56,19 @@ class ChatRequest(BaseModel):
 # In-memory store for active chat sessions (MVP)
 chat_sessions = {}
 
+@app.on_event("startup")
+async def startup_event():
+    # Clear all cached sessions so they're recreated with the current model
+    chat_sessions.clear()
+    print("Chat sessions cleared on startup.")
+
+@app.delete("/api/session/{session_id}")
+def reset_session(session_id: str):
+    """Clears a specific chat session so it gets recreated fresh."""
+    if session_id in chat_sessions:
+        del chat_sessions[session_id]
+    return {"status": "cleared"}
+
 @app.post("/api/chat")
 def chat_with_agent(req: ChatRequest):
     if req.session_id not in chat_sessions:
@@ -65,9 +78,12 @@ def chat_with_agent(req: ChatRequest):
     
     try:
         response = chat.send_message(req.message)
+        # New google-genai SDK: response.text works the same
         return {"response": response.text}
     except Exception as e:
-        return {"error": str(e)}
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e), "response": "Sorry, I encountered an error. Please try again."}
 
 @app.get("/api/cart/{session_id}")
 def get_cart(session_id: str):
@@ -77,6 +93,32 @@ def get_cart(session_id: str):
     items = agent.carts[session_id]
     total = sum(item["price"] * item["quantity"] for item in items)
     return {"items": items, "total": total}
+
+class AddToCartRequest(BaseModel):
+    session_id: str
+    product_id: int
+    quantity: int = 1
+
+@app.post("/api/cart/add")
+def add_to_cart_direct(req: AddToCartRequest, db: Session = Depends(get_db)):
+    product = db.query(models.Product).filter(models.Product.id == req.product_id).first()
+    if not product:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    if req.session_id not in agent.carts:
+        agent.carts[req.session_id] = []
+    
+    # Check if already in cart → increase quantity
+    for item in agent.carts[req.session_id]:
+        if item["id"] == product.id:
+            item["quantity"] += req.quantity
+            agent.audit_logs.append({"session_id": req.session_id, "action": "cart_change", "details": f"Increased qty of {product.name}"})
+            return {"message": f"Updated cart", "items": agent.carts[req.session_id]}
+    
+    agent.carts[req.session_id].append({"id": product.id, "name": product.name, "price": product.price, "quantity": req.quantity})
+    agent.audit_logs.append({"session_id": req.session_id, "action": "cart_change", "details": f"Added {product.name} to cart via product page"})
+    return {"message": f"Added {product.name} to cart", "items": agent.carts[req.session_id]}
 
 import razorpay
 

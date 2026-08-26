@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -16,10 +17,16 @@ interface Product {
   features: string;
 }
 
+const SESSION_ID = "demo-session-123";
+
 export default function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
   const resolvedParams = use(params);
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cartCount, setCartCount] = useState(0);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [addedFeedback, setAddedFeedback] = useState(false);
 
   useEffect(() => {
     fetch(`http://localhost:8000/api/products/${resolvedParams.id}`)
@@ -32,7 +39,41 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         console.error(err);
         setLoading(false);
       });
+
+    // Get current cart count
+    fetch(`http://localhost:8000/api/cart/${SESSION_ID}`)
+      .then(res => res.json())
+      .then(data => setCartCount(data.items?.length || 0));
   }, [resolvedParams.id]);
+
+  const handleAddToCart = async () => {
+    if (!product) return;
+    setAddingToCart(true);
+    try {
+      const res = await fetch("http://localhost:8000/api/cart/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: SESSION_ID, product_id: product.id, quantity: 1 })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCartCount(data.items?.length || 0);
+        setAddedFeedback(true);
+        setTimeout(() => setAddedFeedback(false), 2000);
+      }
+    } catch (err) {
+      console.error("Failed to add to cart", err);
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  const handleAskAI = () => {
+    // Navigate to shop with a pre-filled query about this product
+    if (product) {
+      router.push(`/shop?ask=Tell+me+more+about+${encodeURIComponent(product.name)}`);
+    }
+  };
 
   if (loading) {
     return <div className="min-h-screen bg-black text-white flex justify-center items-center">Loading...</div>;
@@ -42,7 +83,12 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
     return <div className="min-h-screen bg-black text-white flex justify-center items-center">Product not found.</div>;
   }
 
-  const features = JSON.parse(product.features || "[]");
+  let features: string[] = [];
+  try {
+    features = JSON.parse(product.features || "[]");
+  } catch {
+    features = [];
+  }
 
   return (
     <div className="min-h-screen bg-black text-white px-6 py-8">
@@ -54,7 +100,14 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         </Link>
         <div className="flex items-center gap-4">
           <Link href="/cart">
-            <Button variant="outline" className="border-gray-700 text-white">Cart</Button>
+            <Button variant="outline" className="border-gray-700 text-white relative">
+              Cart
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-indigo-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  {cartCount}
+                </span>
+              )}
+            </Button>
           </Link>
         </div>
       </header>
@@ -78,10 +131,25 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           </div>
           
           <div className="flex gap-4">
-            <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1 text-lg py-6 rounded-xl shadow-[0_0_15px_rgba(79,70,229,0.5)] transition duration-300">
-              Add to Cart
+            <Button
+              id="add-to-cart-btn"
+              size="lg"
+              onClick={handleAddToCart}
+              disabled={addingToCart}
+              className={`flex-1 text-lg py-6 rounded-xl transition duration-300 ${
+                addedFeedback
+                  ? "bg-emerald-600 hover:bg-emerald-700 shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+                  : "bg-indigo-600 hover:bg-indigo-700 shadow-[0_0_15px_rgba(79,70,229,0.5)]"
+              }`}
+            >
+              {addingToCart ? "Adding..." : addedFeedback ? "✓ Added to Cart!" : "Add to Cart"}
             </Button>
-            <Button size="lg" variant="outline" className="border-gray-700 text-white hover:bg-gray-800 text-lg py-6 rounded-xl">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleAskAI}
+              className="border-gray-700 text-white hover:bg-gray-800 text-lg py-6 rounded-xl"
+            >
               Ask AI about this
             </Button>
           </div>
