@@ -77,3 +77,40 @@ def get_cart(session_id: str):
     items = agent.carts[session_id]
     total = sum(item["price"] * item["quantity"] for item in items)
     return {"items": items, "total": total}
+
+import razorpay
+
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "mock_id")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "mock_secret")
+
+@app.post("/api/payments/create-order")
+def create_order(req: ChatRequest, db: Session = Depends(get_db)):
+    # Reusing ChatRequest for session_id, message could be email
+    session_id = req.session_id
+    if session_id not in agent.carts or not agent.carts[session_id]:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Cart is empty")
+        
+    items = agent.carts[session_id]
+    total_amount = sum(item["price"] * item["quantity"] for item in items)
+    
+    # 1. AI safety check (already passed if cart has items added via user confirmation)
+    agent.audit_logs.append({"session_id": session_id, "action": "checkout_started", "details": f"Attempting checkout for amount {total_amount}"})
+    
+    # 2. Razorpay Order Creation
+    if RAZORPAY_KEY_ID == "mock_id" or RAZORPAY_KEY_ID == "mock_rp_id":
+        # Mock mode
+        rzp_order_id = "order_mock_" + os.urandom(4).hex()
+    else:
+        client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+        data = { "amount": int(total_amount * 100), "currency": "INR", "receipt": session_id }
+        payment = client.order.create(data=data)
+        rzp_order_id = payment['id']
+        
+    # 3. Save to DB
+    new_order = models.Order(razorpay_order_id=rzp_order_id, amount=total_amount, customer_email="demo@example.com")
+    db.add(new_order)
+    db.commit()
+    db.refresh(new_order)
+    
+    return {"order_id": rzp_order_id, "amount": total_amount * 100, "currency": "INR", "key": RAZORPAY_KEY_ID}
