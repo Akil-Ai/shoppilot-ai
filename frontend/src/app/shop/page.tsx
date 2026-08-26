@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,12 +15,23 @@ interface Product {
   image_url: string;
 }
 
+interface Message {
+  role: "user" | "model";
+  text: string;
+}
+
 export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [chatInput, setChatInput] = useState("");
+  const [messages, setMessages] = useState<Message[]>([
+    { role: "model", text: "Hi! I am ShopPilot. What are you looking for today?" }
+  ]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [sessionId] = useState(() => Math.random().toString(36).substring(7));
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Fetch products from backend
     fetch("http://localhost:8000/api/products")
       .then(res => res.json())
       .then(data => {
@@ -32,6 +43,37 @@ export default function ShopPage() {
         setLoading(false);
       });
   }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const sendChatMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const newMessages = [...messages, { role: "user", text: chatInput } as Message];
+    setMessages(newMessages);
+    setChatInput("");
+    setChatLoading(true);
+
+    try {
+      const res = await fetch("http://localhost:8000/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, message: chatInput })
+      });
+      const data = await res.json();
+      if (data.response) {
+        setMessages([...newMessages, { role: "model", text: data.response }]);
+      } else {
+        setMessages([...newMessages, { role: "model", text: "Sorry, I encountered an error." }]);
+      }
+    } catch (err) {
+      setMessages([...newMessages, { role: "model", text: "Connection error." }]);
+    }
+    setChatLoading(false);
+  };
 
   return (
     <div className="min-h-screen bg-black text-white px-6 py-8">
@@ -50,21 +92,35 @@ export default function ShopPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         {/* Left sidebar / AI Agent placeholder */}
-        <aside className="md:col-span-1 border border-gray-800 bg-gray-950 p-6 rounded-2xl flex flex-col h-[70vh] sticky top-8 shadow-2xl">
+        <aside className="md:col-span-1 border border-gray-800 bg-gray-950 p-6 rounded-2xl flex flex-col h-[75vh] sticky top-8 shadow-2xl">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
             ShopPilot Agent
           </h2>
-          <div className="flex-1 overflow-y-auto mb-4 border border-gray-800 rounded-xl p-4 bg-black">
-            <p className="text-gray-400 text-sm">Hi! I am ShopPilot. What are you looking for today?</p>
+          <div className="flex-1 overflow-y-auto mb-4 border border-gray-800 rounded-xl p-4 bg-black flex flex-col gap-3">
+            {messages.map((msg, idx) => (
+              <div key={idx} className={`p-3 rounded-lg max-w-[90%] text-sm ${msg.role === "user" ? "bg-indigo-600 self-end" : "bg-gray-800 self-start text-gray-300"}`}>
+                {msg.text}
+              </div>
+            ))}
+            {chatLoading && (
+              <div className="p-3 rounded-lg bg-gray-800 self-start text-gray-300 max-w-[90%] text-sm flex gap-1">
+                <span className="animate-bounce">.</span><span className="animate-bounce delay-75">.</span><span className="animate-bounce delay-150">.</span>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-          <div className="mt-auto">
+          <form onSubmit={sendChatMessage} className="mt-auto flex gap-2">
             <input 
               type="text" 
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
               placeholder="E.g. headphones under ₹3000..." 
-              className="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-indigo-500"
+              className="flex-1 bg-black border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-indigo-500"
+              disabled={chatLoading}
             />
-          </div>
+            <Button type="submit" disabled={chatLoading} className="bg-indigo-600 hover:bg-indigo-700">Send</Button>
+          </form>
         </aside>
 
         {/* Main Product Grid */}

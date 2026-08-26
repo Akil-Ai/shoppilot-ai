@@ -44,3 +44,27 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Product not found")
     return product
+
+# Chat endpoints
+from pydantic import BaseModel
+import agent
+
+class ChatRequest(BaseModel):
+    session_id: str
+    message: str
+
+# In-memory store for active chat sessions (MVP)
+chat_sessions = {}
+
+@app.post("/api/chat")
+def chat_with_agent(req: ChatRequest):
+    if req.session_id not in chat_sessions:
+        chat_sessions[req.session_id] = agent.get_chat_session()
+    
+    chat = chat_sessions[req.session_id]
+    
+    try:
+        response = chat.send_message(req.message)
+        return {"response": response.text}
+    except Exception as e:
+        return {"error": str(e)}
