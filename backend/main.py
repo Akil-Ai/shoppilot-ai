@@ -158,3 +158,30 @@ from fastapi import Request
 async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
     payload = await request.json()
     return {"status": "received"}
+
+@app.get("/api/dashboard/stats")
+def get_dashboard_stats(db: Session = Depends(get_db)):
+    orders = db.query(models.Order).filter(models.Order.status == "paid").all()
+    total_revenue = sum(o.amount for o in orders)
+    
+    # Mocking some AI metrics based on total_revenue for demo
+    ai_assisted_revenue = total_revenue * 0.8
+    upsell_revenue = total_revenue * 0.15
+    
+    return {
+        "total_revenue": total_revenue,
+        "ai_assisted_revenue": ai_assisted_revenue,
+        "orders_count": len(orders),
+        "average_order_value": total_revenue / len(orders) if orders else 0,
+        "conversion_rate": "12.5%", # Mock conversion rate
+        "upsell_revenue": upsell_revenue,
+        "recommendation_conversion": "18.2%",
+        "recent_transactions": [
+            {"id": o.id, "amount": o.amount, "status": o.status, "email": o.customer_email} 
+            for o in reversed(orders[-5:])
+        ]
+    }
+
+@app.get("/api/dashboard/audit")
+def get_audit_logs():
+    return agent.audit_logs[::-1] # Reverse to show newest first
