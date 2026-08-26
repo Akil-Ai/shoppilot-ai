@@ -114,3 +114,47 @@ def create_order(req: ChatRequest, db: Session = Depends(get_db)):
     db.refresh(new_order)
     
     return {"order_id": rzp_order_id, "amount": total_amount * 100, "currency": "INR", "key": RAZORPAY_KEY_ID}
+
+class VerifyRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+@app.post("/api/payments/verify")
+def verify_payment(req: VerifyRequest, db: Session = Depends(get_db)):
+    # 1. Signature Verification
+    if RAZORPAY_KEY_ID == "mock_id" or RAZORPAY_KEY_ID == "mock_rp_id":
+        is_valid = True
+    else:
+        try:
+            client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+            client.utility.verify_payment_signature({
+                'razorpay_order_id': req.razorpay_order_id,
+                'razorpay_payment_id': req.razorpay_payment_id,
+                'razorpay_signature': req.razorpay_signature
+            })
+            is_valid = True
+        except Exception as e:
+            is_valid = False
+
+    if is_valid:
+        order = db.query(models.Order).filter(models.Order.razorpay_order_id == req.razorpay_order_id).first()
+        if order:
+            order.status = "paid"
+            order.razorpay_payment_id = req.razorpay_payment_id
+            db.commit()
+            agent.audit_logs.append({"session_id": "verified", "action": "payment_success", "details": f"Order {order.id} paid successfully"})
+            
+            if "demo-session-123" in agent.carts:
+                agent.carts["demo-session-123"] = []
+
+        return {"status": "success"}
+    else:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Signature verification failed")
+
+from fastapi import Request
+@app.post("/api/payments/webhook")
+async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
+    payload = await request.json()
+    return {"status": "received"}
