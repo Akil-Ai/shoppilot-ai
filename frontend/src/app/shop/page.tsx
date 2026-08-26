@@ -28,7 +28,7 @@ export default function ShopPage() {
     { role: "model", text: "Hi! I am ShopPilot. What are you looking for today?" }
   ]);
   const [chatLoading, setChatLoading] = useState(false);
-  const [sessionId] = useState(() => Math.random().toString(36).substring(7));
+  const [sessionId] = useState("demo-session-123");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

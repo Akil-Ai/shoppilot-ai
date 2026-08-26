@@ -59,7 +59,7 @@ chat_sessions = {}
 @app.post("/api/chat")
 def chat_with_agent(req: ChatRequest):
     if req.session_id not in chat_sessions:
-        chat_sessions[req.session_id] = agent.get_chat_session()
+        chat_sessions[req.session_id] = agent.get_chat_session(req.session_id)
     
     chat = chat_sessions[req.session_id]
     
@@ -68,3 +68,12 @@ def chat_with_agent(req: ChatRequest):
         return {"response": response.text}
     except Exception as e:
         return {"error": str(e)}
+
+@app.get("/api/cart/{session_id}")
+def get_cart(session_id: str):
+    if session_id not in agent.carts:
+        return {"items": [], "total": 0}
+    
+    items = agent.carts[session_id]
+    total = sum(item["price"] * item["quantity"] for item in items)
+    return {"items": items, "total": total}
